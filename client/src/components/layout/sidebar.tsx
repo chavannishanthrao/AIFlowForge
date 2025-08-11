@@ -55,19 +55,18 @@ export default function Sidebar() {
             const isActive = location === item.href;
             return (
               <li key={item.name}>
-                <Link href={item.href}>
-                  <a 
-                    className={cn(
-                      "flex items-center px-3 py-2 rounded-lg font-medium transition-colors",
-                      isActive
-                        ? "text-primary-600 bg-primary-50"
-                        : "text-gray-700 hover:bg-gray-100"
-                    )}
-                    data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <item.icon className="w-5 h-5 mr-3" />
-                    {item.name}
-                  </a>
+                <Link 
+                  href={item.href}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-lg font-medium transition-colors",
+                    isActive
+                      ? "text-primary-600 bg-primary-50"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                  data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <item.icon className="w-5 h-5 mr-3" />
+                  {item.name}
                 </Link>
               </li>
             );
@@ -83,19 +82,18 @@ export default function Sidebar() {
               const isActive = location === item.href;
               return (
                 <li key={item.name}>
-                  <Link href={item.href}>
-                    <a 
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-lg font-medium transition-colors",
-                        isActive
-                          ? "text-primary-600 bg-primary-50"
-                          : "text-gray-700 hover:bg-gray-100"
-                      )}
-                      data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <item.icon className="w-5 h-5 mr-3" />
-                      {item.name}
-                    </a>
+                  <Link 
+                    href={item.href}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-lg font-medium transition-colors",
+                      isActive
+                        ? "text-primary-600 bg-primary-50"
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}
+                    data-testid={`nav-link-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <item.icon className="w-5 h-5 mr-3" />
+                    {item.name}
                   </Link>
                 </li>
               );

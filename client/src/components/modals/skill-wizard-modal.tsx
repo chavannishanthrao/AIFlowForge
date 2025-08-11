@@ -61,14 +61,13 @@ export default function SkillWizardModal({ isOpen, onClose }: SkillWizardModalPr
   const generateSkillMutation = useMutation({
     mutationFn: (data: { prompt: string; skillName: string }) =>
       apiRequest("POST", "/api/skills/generate", data),
-    onSuccess: (response) => {
-      const skillData = response.json();
-      setGeneratedSkill(skillData.skill);
-      form.setValue("name", skillData.skill.name);
-      form.setValue("description", skillData.skill.description);
-      form.setValue("type", skillData.skill.type);
-      form.setValue("config", skillData.skill.config);
-      form.setValue("requiredConnectors", skillData.skill.requiredConnectors);
+    onSuccess: (response: any) => {
+      setGeneratedSkill(response.skill);
+      form.setValue("name", response.skill.name);
+      form.setValue("description", response.skill.description);
+      form.setValue("type", response.skill.type);
+      form.setValue("config", response.skill.config);
+      form.setValue("requiredConnectors", response.skill.requiredConnectors);
       toast({
         title: "Success",
         description: "AI-generated skill created successfully",

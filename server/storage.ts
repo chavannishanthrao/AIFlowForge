@@ -200,6 +200,46 @@ export class MemStorage implements IStorage {
       executedBy: adminUser.id,
     };
     this.executions.set(execution1.id, execution1);
+
+    // Additional sample execution
+    const execution2: Execution = {
+      id: randomUUID(),
+      workflowId: invoiceWorkflow.id,
+      status: "running",
+      input: { triggerType: "manual" },
+      output: {},
+      error: null,
+      startedAt: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+      completedAt: null,
+      executedBy: adminUser.id,
+    };
+    this.executions.set(execution2.id, execution2);
+
+    // Create additional workflow - Customer Onboarding
+    const onboardingWorkflow: Workflow = {
+      id: randomUUID(),
+      name: "Customer Onboarding Automation",
+      description: "Automated customer onboarding process with welcome emails and account setup",
+      definition: {
+        nodes: [
+          { id: "trigger", type: "webhook", config: { endpoint: "/webhook/new-customer" } },
+          { id: "salesforce", type: "connector", config: { connectorId: salesforceConnector.id } },
+          { id: "welcome", type: "skill", config: { skillId: invoiceSkill.id } },
+          { id: "notify", type: "action", config: { recipient: "support@company.com" } }
+        ],
+        edges: [
+          { from: "trigger", to: "salesforce" },
+          { from: "salesforce", to: "welcome" },
+          { from: "welcome", to: "notify" }
+        ]
+      },
+      isActive: true,
+      schedule: null,
+      createdBy: adminUser.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.workflows.set(onboardingWorkflow.id, onboardingWorkflow);
   }
 
   // Users
