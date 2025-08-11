@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Clock, Zap, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Clock, Zap, Activity, Bot, Lightbulb, Target, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { useState } from "react";
 
@@ -359,6 +359,158 @@ export default function AdvancedAnalytics() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Agent Performance Metrics & Optimization Suggestions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Bot className="h-5 w-5" />
+              <span>Agent Performance Metrics</span>
+            </CardTitle>
+            <CardDescription>Real-time performance metrics for each AI agent</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {(analytics as any)?.agentPerformanceMetrics?.slice(0, 5).map((agent: any, index: number) => (
+                <div key={agent.id} className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{agent.name}</p>
+                        <p className="text-xs text-muted-foreground">{agent.executions} executions</p>
+                      </div>
+                    </div>
+                    <Badge variant={agent.successRate > 90 ? "default" : agent.successRate > 70 ? "secondary" : "destructive"}>
+                      {agent.successRate}% success
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Avg Time</p>
+                      <p className="font-medium">{formatDuration(agent.averageTime)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Tokens</p>
+                      <p className="font-medium">{agent.tokensUsed.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Cost</p>
+                      <p className="font-medium">{formatCurrency(agent.cost)}</p>
+                    </div>
+                  </div>
+                </div>
+              )) || (
+                <p className="text-muted-foreground text-sm text-center py-8">
+                  No agent performance data available yet
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Lightbulb className="h-5 w-5" />
+              <span>Optimization Suggestions</span>
+            </CardTitle>
+            <CardDescription>AI-powered recommendations to improve performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {(analytics as any)?.optimizationSuggestions?.slice(0, 4).map((suggestion: any, index: number) => (
+                <div key={index} className="p-4 border rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      suggestion.priority === 'high' ? 'bg-red-100 text-red-600' :
+                      suggestion.priority === 'medium' ? 'bg-yellow-100 text-yellow-600' :
+                      'bg-green-100 text-green-600'
+                    }`}>
+                      {suggestion.type === 'cost_optimization' ? <DollarSign className="h-4 w-4" /> :
+                       suggestion.type === 'performance_optimization' ? <Clock className="h-4 w-4" /> :
+                       suggestion.type === 'reliability_optimization' ? <Target className="h-4 w-4" /> :
+                       <Bot className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-sm">{suggestion.title}</p>
+                        <Badge variant={
+                          suggestion.priority === 'high' ? 'destructive' :
+                          suggestion.priority === 'medium' ? 'secondary' : 'outline'
+                        }>
+                          {suggestion.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{suggestion.description}</p>
+                      {suggestion.potentialSavings && (
+                        <p className="text-xs text-green-600 font-medium">
+                          Potential savings: {formatCurrency(suggestion.potentialSavings)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )) || (
+                <div className="text-center py-8">
+                  <Zap className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <p className="text-muted-foreground">System is optimally configured!</p>
+                  <p className="text-sm text-muted-foreground">No optimization suggestions at this time</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Usage Patterns Analysis */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="h-5 w-5" />
+            <span>Usage Patterns & Insights</span>
+          </CardTitle>
+          <CardDescription>Intelligent analysis of system usage and resource patterns</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">Peak Usage Hours</h4>
+              <div className="flex flex-wrap gap-2">
+                {(analytics as any)?.usagePatterns?.peakHours?.map((hour: number) => (
+                  <Badge key={hour} variant="outline" className="text-xs">
+                    {hour}:00
+                  </Badge>
+                )) || <p className="text-xs text-muted-foreground">No peak hours identified</p>}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">Most Active Workflows</h4>
+              <div className="space-y-1">
+                {(analytics as any)?.usagePatterns?.mostActiveWorkflows?.map((workflow: string, index: number) => (
+                  <p key={index} className="text-xs text-muted-foreground truncate">{workflow}</p>
+                )) || <p className="text-xs text-muted-foreground">No active workflows</p>}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">Resource Bottlenecks</h4>
+              <div className="space-y-1">
+                {(analytics as any)?.usagePatterns?.resourceBottlenecks?.length > 0 ? 
+                  (analytics as any).usagePatterns.resourceBottlenecks.map((resource: string, index: number) => (
+                    <Badge key={index} variant="destructive" className="text-xs mr-1 mb-1">
+                      {resource}
+                    </Badge>
+                  )) : 
+                  <p className="text-xs text-green-600">No bottlenecks detected</p>
+                }
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

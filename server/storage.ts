@@ -813,6 +813,9 @@ export class MemStorage implements IStorage {
     topPerformingWorkflows: Array<{ id: string; name: string; executions: number; successRate: number }>;
     costByWorkflow: Array<{ workflowId: string; name: string; cost: number }>;
     alertsSummary: { critical: number; high: number; medium: number; low: number };
+    agentPerformanceMetrics: Array<{ id: string; name: string; executions: number; averageTime: number; successRate: number; tokensUsed: number; cost: number }>;
+    optimizationSuggestions: Array<{ type: string; title: string; description: string; priority: 'high' | 'medium' | 'low'; potentialSavings?: number }>;
+    usagePatterns: { peakHours: number[]; mostActiveWorkflows: string[]; resourceBottlenecks: string[] };
   }> {
     const now = new Date();
     const monthAgo = new Date();
@@ -876,13 +879,101 @@ export class MemStorage implements IStorage {
       low: activeAlerts.filter(a => a.severity === 'low').length,
     };
     
+    // Calculate agent performance metrics
+    const agents = Array.from(this.agents.values());
+    const agentPerformanceMetrics = agents.map(agent => {
+      const agentMetrics = recentMetrics.filter(m => m.agentId === agent.id);
+      const agentExecutions = recentExecutions.filter(e => {
+        // Find executions that used this agent
+        return agentMetrics.some(m => m.executionId === e.id);
+      });
+      
+      const successful = agentExecutions.filter(e => e.status === 'success').length;
+      const totalTokens = agentMetrics.reduce((sum, m) => sum + (m.tokensUsed || 0), 0);
+      const totalCost = agentMetrics.reduce((sum, m) => sum + (m.cost || 0), 0);
+      const avgTime = agentMetrics.length > 0 
+        ? Math.round(agentMetrics.reduce((sum, m) => sum + (m.duration || 0), 0) / agentMetrics.length) 
+        : 0;
+      const successRate = agentExecutions.length > 0 
+        ? Math.round((successful / agentExecutions.length) * 100) 
+        : 0;
+
+      return {
+        id: agent.id,
+        name: agent.name,
+        executions: agentExecutions.length,
+        averageTime: avgTime,
+        successRate,
+        tokensUsed: totalTokens,
+        cost: totalCost
+      };
+    }).sort((a, b) => b.executions - a.executions);
+
+    // Generate optimization suggestions based on analytics
+    const optimizationSuggestions = [];
+    
+    // Cost optimization suggestions
+    if (totalCostThisMonth > 500) { // $5.00 threshold
+      const highCostWorkflow = costByWorkflow[0];
+      if (highCostWorkflow && highCostWorkflow.cost > 200) { // $2.00
+        optimizationSuggestions.push({
+          type: 'cost_optimization',
+          title: 'High Cost Workflow Detected',
+          description: `${highCostWorkflow.name} is consuming ${((highCostWorkflow.cost / totalCostThisMonth) * 100).toFixed(1)}% of your monthly budget. Consider optimizing token usage or model selection.`,
+          priority: 'high' as const,
+          potentialSavings: Math.round(highCostWorkflow.cost * 0.3) // 30% potential savings
+        });
+      }
+    }
+
+    // Performance optimization
+    if (averageExecutionTime > 5000) { // > 5 seconds
+      optimizationSuggestions.push({
+        type: 'performance_optimization',
+        title: 'Slow Execution Times Detected',
+        description: 'Average workflow execution time is above optimal threshold. Consider implementing caching or optimizing agent prompts.',
+        priority: 'medium' as const
+      });
+    }
+
+    // Success rate optimization
+    if (successRate < 90) {
+      optimizationSuggestions.push({
+        type: 'reliability_optimization',
+        title: 'Success Rate Below Target',
+        description: `Current success rate is ${successRate}%. Review failed executions and implement better error handling or retry logic.`,
+        priority: 'high' as const
+      });
+    }
+
+    // Resource utilization
+    const lowPerformingAgents = agentPerformanceMetrics.filter(a => a.successRate < 80);
+    if (lowPerformingAgents.length > 0) {
+      optimizationSuggestions.push({
+        type: 'agent_optimization',
+        title: 'Agent Performance Issues',
+        description: `${lowPerformingAgents.length} agent(s) have success rates below 80%. Review their configurations and training data.`,
+        priority: 'medium' as const
+      });
+    }
+
+    // Usage patterns analysis
+    const usagePatterns = {
+      peakHours: [9, 10, 11, 14, 15, 16], // Simulated peak hours based on business hours
+      mostActiveWorkflows: topPerformingWorkflows.slice(0, 3).map(w => w.name),
+      resourceBottlenecks: activeAlerts.filter(a => a.type.includes('high_') || a.type.includes('resource')).map(a => a.resourceType).filter((value, index, self) => self.indexOf(value) === index)
+    };
+
     return {
       totalCostThisMonth,
       averageExecutionTime,
       successRate,
       topPerformingWorkflows,
       costByWorkflow,
-      alertsSummary
+      alertsSummary,
+      agentPerformanceMetrics,
+      optimizationSuggestions,
+      usagePatterns
     };
   }
 }
