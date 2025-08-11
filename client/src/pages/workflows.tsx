@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Plus, Workflow as WorkflowIcon, Settings, Trash2, Play, Calendar } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +18,12 @@ import type { Workflow } from "@shared/schema";
 export default function Workflows() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newWorkflow, setNewWorkflow] = useState({
+    name: "",
+    description: "",
+    schedule: "",
+  });
 
   const { data: workflows, isLoading } = useQuery<Workflow[]>({
     queryKey: ["/api/workflows"],
@@ -36,6 +46,47 @@ export default function Workflows() {
       });
     },
   });
+
+  const createWorkflowMutation = useMutation({
+    mutationFn: (workflow: typeof newWorkflow) => apiRequest("POST", "/api/workflows", {
+      ...workflow,
+      definition: {
+        nodes: [
+          { id: "start", type: "trigger", config: { type: "manual" } }
+        ],
+        edges: []
+      },
+      isActive: true,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
+      setIsCreateOpen(false);
+      setNewWorkflow({ name: "", description: "", schedule: "" });
+      toast({
+        title: "Success",
+        description: "Workflow created successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create workflow",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateWorkflow = () => {
+    if (!newWorkflow.name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Workflow name is required",
+      });
+      return;
+    }
+    createWorkflowMutation.mutate(newWorkflow);
+  };
 
   if (isLoading) {
     return (
@@ -72,13 +123,65 @@ export default function Workflows() {
           title="Workflows" 
           subtitle="Create and manage automation workflows"
           action={
-            <Button 
-              className="bg-primary-500 hover:bg-primary-600 text-white"
-              data-testid="button-create-workflow"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Workflow
-            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  className="bg-primary-500 hover:bg-primary-600 text-white"
+                  data-testid="button-create-workflow"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Workflow
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create New Workflow</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="Workflow name..."
+                      value={newWorkflow.name}
+                      onChange={(e) => setNewWorkflow(prev => ({ ...prev, name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Workflow description..."
+                      value={newWorkflow.description}
+                      onChange={(e) => setNewWorkflow(prev => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="schedule">Schedule (optional)</Label>
+                    <Input
+                      id="schedule"
+                      placeholder="Cron expression (e.g., 0 9 * * 1)"
+                      value={newWorkflow.schedule}
+                      onChange={(e) => setNewWorkflow(prev => ({ ...prev, schedule: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsCreateOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleCreateWorkflow}
+                      disabled={createWorkflowMutation.isPending}
+                    >
+                      {createWorkflowMutation.isPending ? "Creating..." : "Create Workflow"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           }
         />
         
@@ -94,6 +197,7 @@ export default function Workflows() {
                 <Button 
                   className="bg-primary-500 hover:bg-primary-600 text-white"
                   data-testid="button-create-first-workflow"
+                  onClick={() => setIsCreateOpen(true)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Your First Workflow
@@ -167,10 +271,10 @@ export default function Workflows() {
 
                     <div className="mb-3">
                       <p className="text-xs font-medium text-gray-500 mb-1">
-                        Nodes: {workflow.definition?.nodes?.length || 0}
+                        Nodes: {(workflow.definition as any)?.nodes?.length || 0}
                       </p>
                       <div className="flex space-x-1">
-                        {workflow.definition?.nodes?.slice(0, 4).map((node: any, index: number) => (
+                        {(workflow.definition as any)?.nodes?.slice(0, 4).map((node: any, index: number) => (
                           <Badge 
                             key={index} 
                             variant="outline" 
@@ -180,9 +284,9 @@ export default function Workflows() {
                             {node.type}
                           </Badge>
                         ))}
-                        {(workflow.definition?.nodes?.length || 0) > 4 && (
+                        {((workflow.definition as any)?.nodes?.length || 0) > 4 && (
                           <Badge variant="outline" className="text-xs">
-                            +{workflow.definition.nodes.length - 4}
+                            +{(workflow.definition as any).nodes.length - 4}
                           </Badge>
                         )}
                       </div>
@@ -190,7 +294,7 @@ export default function Workflows() {
 
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span data-testid={`text-workflow-created-${workflow.id}`}>
-                        {new Date(workflow.createdAt).toLocaleDateString()}
+                        {workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString() : "N/A"}
                       </span>
                     </div>
                   </CardContent>
