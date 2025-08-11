@@ -334,14 +334,14 @@ export class MemStorage implements IStorage {
       id,
       name: insertAgent.name,
       description: insertAgent.description || null,
-      credentials: insertAgent.credentials,
+      credentials: insertAgent.credentials || null,
       isActive: insertAgent.isActive ?? true,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: insertAgent.createdBy || null,
-      skillIds: insertAgent.skillIds,
+      skillIds: insertAgent.skillIds || [],
       promptSettings: insertAgent.promptSettings,
-      memoryPolicy: insertAgent.memoryPolicy,
+      memoryPolicy: insertAgent.memoryPolicy || "session",
     };
     this.agents.set(id, agent);
     return agent;
@@ -372,8 +372,13 @@ export class MemStorage implements IStorage {
   async createWorkflow(insertWorkflow: InsertWorkflow): Promise<Workflow> {
     const id = randomUUID();
     const workflow: Workflow = {
-      ...insertWorkflow,
       id,
+      name: insertWorkflow.name,
+      description: insertWorkflow.description || null,
+      definition: insertWorkflow.definition,
+      isActive: insertWorkflow.isActive ?? true,
+      schedule: insertWorkflow.schedule || null,
+      createdBy: insertWorkflow.createdBy || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -406,8 +411,13 @@ export class MemStorage implements IStorage {
   async createConnector(insertConnector: InsertConnector): Promise<Connector> {
     const id = randomUUID();
     const connector: Connector = {
-      ...insertConnector,
       id,
+      name: insertConnector.name,
+      type: insertConnector.type,
+      config: insertConnector.config,
+      credentials: insertConnector.credentials || null,
+      isActive: insertConnector.isActive ?? true,
+      createdBy: insertConnector.createdBy || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -434,7 +444,11 @@ export class MemStorage implements IStorage {
     if (workflowId) {
       executions = executions.filter(exec => exec.workflowId === workflowId);
     }
-    return executions.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    return executions.sort((a, b) => {
+      const aTime = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+      const bTime = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+      return bTime - aTime;
+    });
   }
 
   async getExecution(id: string): Promise<Execution | undefined> {
@@ -444,9 +458,15 @@ export class MemStorage implements IStorage {
   async createExecution(insertExecution: InsertExecution): Promise<Execution> {
     const id = randomUUID();
     const execution: Execution = {
-      ...insertExecution,
       id,
+      workflowId: insertExecution.workflowId || null,
+      status: insertExecution.status || "pending",
+      input: insertExecution.input || null,
+      output: insertExecution.output || null,
+      error: insertExecution.error || null,
       startedAt: new Date(),
+      completedAt: insertExecution.completedAt || null,
+      executedBy: insertExecution.executedBy || null,
     };
     this.executions.set(id, execution);
     return execution;
@@ -467,14 +487,22 @@ export class MemStorage implements IStorage {
     if (userId) {
       logs = logs.filter(log => log.userId === userId);
     }
-    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return logs.sort((a, b) => {
+      const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return bTime - aTime;
+    });
   }
 
   async createAuditLog(insertLog: InsertAuditLog): Promise<AuditLog> {
     const id = randomUUID();
     const log: AuditLog = {
-      ...insertLog,
       id,
+      action: insertLog.action,
+      resourceType: insertLog.resourceType,
+      resourceId: insertLog.resourceId || null,
+      userId: insertLog.userId || null,
+      details: insertLog.details || null,
       timestamp: new Date(),
     };
     this.auditLogs.set(id, log);
@@ -493,8 +521,12 @@ export class MemStorage implements IStorage {
   async createDocument(insertDocument: InsertDocument): Promise<Document> {
     const id = randomUUID();
     const document: Document = {
-      ...insertDocument,
       id,
+      title: insertDocument.title,
+      content: insertDocument.content,
+      metadata: insertDocument.metadata || null,
+      embedding: insertDocument.embedding || null,
+      uploadedBy: insertDocument.uploadedBy || null,
       createdAt: new Date(),
     };
     this.documents.set(id, document);
