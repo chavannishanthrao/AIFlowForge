@@ -2,7 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { insertSkillSchema, insertAgentSchema, insertWorkflowSchema, insertConnectorSchema, insertDocumentSchema } from "@shared/schema";
+import { 
+  insertSkillSchema, insertAgentSchema, insertWorkflowSchema, 
+  insertConnectorSchema, insertDocumentSchema,
+  insertEmailAccountSchema, insertEmailMessageSchema,
+  insertEmailAttachmentSchema, insertEmailRuleSchema
+} from "@shared/schema";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -593,6 +598,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ skill: generatedSkill });
     } catch (error) {
       res.status(500).json({ error: "Failed to generate skill" });
+    }
+  });
+
+  // Email Processing System Routes
+  app.get("/api/email-accounts", async (req, res) => {
+    try {
+      const accounts = await storage.getEmailAccounts();
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get email accounts" });
+    }
+  });
+
+  app.post("/api/email-accounts", async (req, res) => {
+    try {
+      const data = insertEmailAccountSchema.parse(req.body);
+      const account = await storage.createEmailAccount(data);
+      res.status(201).json(account);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create email account" });
+      }
+    }
+  });
+
+  app.patch("/api/email-accounts/:id", async (req, res) => {
+    try {
+      const data = insertEmailAccountSchema.partial().parse(req.body);
+      const account = await storage.updateEmailAccount(req.params.id, data);
+      if (!account) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+      res.json(account);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update email account" });
+      }
+    }
+  });
+
+  app.delete("/api/email-accounts/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteEmailAccount(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete email account" });
+    }
+  });
+
+  app.get("/api/email-messages", async (req, res) => {
+    try {
+      const accountId = req.query.accountId as string;
+      const messages = await storage.getEmailMessages(accountId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get email messages" });
+    }
+  });
+
+  app.get("/api/email-messages/:id", async (req, res) => {
+    try {
+      const message = await storage.getEmailMessage(req.params.id);
+      if (!message) {
+        return res.status(404).json({ error: "Email message not found" });
+      }
+      res.json(message);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get email message" });
+    }
+  });
+
+  app.get("/api/email-attachments", async (req, res) => {
+    try {
+      const messageId = req.query.messageId as string;
+      if (!messageId) {
+        return res.status(400).json({ error: "messageId is required" });
+      }
+      const attachments = await storage.getEmailAttachments(messageId);
+      res.json(attachments);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get email attachments" });
+    }
+  });
+
+  app.get("/api/email-rules", async (req, res) => {
+    try {
+      const accountId = req.query.accountId as string;
+      const rules = await storage.getEmailRules(accountId);
+      res.json(rules);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get email rules" });
+    }
+  });
+
+  app.post("/api/email-rules", async (req, res) => {
+    try {
+      const data = insertEmailRuleSchema.parse(req.body);
+      const rule = await storage.createEmailRule(data);
+      res.status(201).json(rule);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create email rule" });
+      }
+    }
+  });
+
+  app.patch("/api/email-rules/:id", async (req, res) => {
+    try {
+      const data = insertEmailRuleSchema.partial().parse(req.body);
+      const rule = await storage.updateEmailRule(req.params.id, data);
+      if (!rule) {
+        return res.status(404).json({ error: "Email rule not found" });
+      }
+      res.json(rule);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: "Validation error", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update email rule" });
+      }
+    }
+  });
+
+  app.delete("/api/email-rules/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteEmailRule(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Email rule not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete email rule" });
+    }
+  });
+
+  // Email Processing Operations
+  app.post("/api/email-process/:messageId", async (req, res) => {
+    try {
+      const result = await storage.processIncomingEmail(req.params.messageId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process email" });
+    }
+  });
+
+  app.post("/api/email-extract/:attachmentId", async (req, res) => {
+    try {
+      const result = await storage.extractDataFromAttachment(req.params.attachmentId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to extract attachment data" });
+    }
+  });
+
+  app.post("/api/email-sync/:accountId", async (req, res) => {
+    try {
+      const result = await storage.syncEmailAccount(req.params.accountId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to sync email account" });
     }
   });
 

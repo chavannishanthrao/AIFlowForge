@@ -146,6 +146,75 @@ export const usageStats = pgTable("usage_stats", {
   activeUsers: integer("active_users").default(0),
 });
 
+// Email Processing System for Gmail Integration & Workflow Automation
+export const emailAccounts = pgTable("email_accounts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  provider: varchar("provider", { length: 50 }).notNull(), // gmail, outlook, exchange
+  credentials: jsonb("credentials").notNull(), // OAuth tokens, connection details
+  isActive: boolean("is_active").default(true).notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const emailMessages = pgTable("email_messages", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: uuid("account_id").references(() => emailAccounts.id).notNull(),
+  messageId: varchar("message_id", { length: 255 }).notNull(), // Provider message ID
+  threadId: varchar("thread_id", { length: 255 }),
+  from: varchar("from", { length: 255 }).notNull(),
+  to: text("to").notNull(), // JSON array of recipients
+  cc: text("cc"),
+  bcc: text("bcc"),
+  subject: varchar("subject", { length: 500 }),
+  body: text("body"),
+  isRead: boolean("is_read").default(false),
+  hasAttachments: boolean("has_attachments").default(false),
+  receivedAt: timestamp("received_at").notNull(),
+  processedAt: timestamp("processed_at"),
+  processingStatus: varchar("processing_status", { length: 50 }).default("pending"), // pending, processing, completed, failed
+  workflowId: uuid("workflow_id").references(() => workflows.id),
+  executionId: uuid("execution_id").references(() => executions.id),
+  extractedData: jsonb("extracted_data"), // AI-extracted structured data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const emailAttachments = pgTable("email_attachments", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: uuid("message_id").references(() => emailMessages.id).notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  size: integer("size").notNull(), // File size in bytes
+  content: text("content"), // Base64 encoded content for small files
+  filePath: varchar("file_path", { length: 500 }), // Path for larger files
+  processedAt: timestamp("processed_at"),
+  extractedData: jsonb("extracted_data"), // AI-extracted data from attachment
+  processingStatus: varchar("processing_status", { length: 50 }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Email Processing Rules and Triggers
+export const emailRules = pgTable("email_rules", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  accountId: uuid("account_id").references(() => emailAccounts.id).notNull(),
+  conditions: jsonb("conditions").notNull(), // Match criteria (sender, subject, attachment types, etc.)
+  actions: jsonb("actions").notNull(), // Workflow to trigger, data extraction rules
+  workflowId: uuid("workflow_id").references(() => workflows.id),
+  priority: integer("priority").default(0), // Rule execution priority
+  isActive: boolean("is_active").default(true).notNull(),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  triggerCount: integer("trigger_count").default(0),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -206,6 +275,30 @@ export const insertUsageStatSchema = createInsertSchema(usageStats).omit({
   id: true,
 });
 
+export const insertEmailAccountSchema = createInsertSchema(emailAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailAttachmentSchema = createInsertSchema(emailAttachments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailRuleSchema = createInsertSchema(emailRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -239,3 +332,15 @@ export type PerformanceAlert = typeof performanceAlerts.$inferSelect;
 
 export type InsertUsageStat = z.infer<typeof insertUsageStatSchema>;
 export type UsageStat = typeof usageStats.$inferSelect;
+
+export type InsertEmailAccount = z.infer<typeof insertEmailAccountSchema>;
+export type EmailAccount = typeof emailAccounts.$inferSelect;
+
+export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
+export type EmailMessage = typeof emailMessages.$inferSelect;
+
+export type InsertEmailAttachment = z.infer<typeof insertEmailAttachmentSchema>;
+export type EmailAttachment = typeof emailAttachments.$inferSelect;
+
+export type InsertEmailRule = z.infer<typeof insertEmailRuleSchema>;
+export type EmailRule = typeof emailRules.$inferSelect;
