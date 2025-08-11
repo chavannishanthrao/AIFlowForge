@@ -694,8 +694,8 @@ export default function AgentBuilder({ isOpen, onClose, editingAgent }: AgentBui
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             {editingAgent ? "Edit Agent" : "Create New Agent"}
           </DialogTitle>
@@ -703,7 +703,7 @@ export default function AgentBuilder({ isOpen, onClose, editingAgent }: AgentBui
 
         {/* Progress Indicator */}
         {!editingAgent && (
-          <div className="mb-6">
+          <div className="mb-6 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">Step {currentStep + 1} of {steps.length}</span>
               <span className="text-sm text-gray-500">
@@ -724,12 +724,12 @@ export default function AgentBuilder({ isOpen, onClose, editingAgent }: AgentBui
         )}
 
         {/* Step Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0 px-1">
           {renderStepContent()}
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between pt-4 border-t">
+        <div className="flex justify-between pt-4 border-t flex-shrink-0">
           <Button
             variant="outline"
             onClick={handlePrevious}

@@ -497,13 +497,13 @@ export default function ConnectorSetupWizard({ isOpen, onClose, onComplete }: Co
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Create New Connector</DialogTitle>
         </DialogHeader>
 
         {/* Progress Indicator */}
-        <div className="mb-6">
+        <div className="mb-6 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Step {currentStep + 1} of {steps.length}</span>
             <span className="text-sm text-gray-500">{Math.round(((currentStep + 1) / steps.length) * 100)}% Complete</span>
@@ -521,12 +521,12 @@ export default function ConnectorSetupWizard({ isOpen, onClose, onComplete }: Co
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0 px-1">
           {renderStepContent()}
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between pt-4 border-t">
+        <div className="flex justify-between pt-4 border-t flex-shrink-0">
           <Button
             variant="outline"
             onClick={handlePrevious}
