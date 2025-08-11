@@ -480,10 +480,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const embedding = Array.from({length: 1536}, () => Math.random());
       
       const documentWithEmbedding = {
-        ...validatedData,
+        title: validatedData.title,
+        content: validatedData.content,
+        uploadedBy: validatedData.uploadedBy,
         embedding: JSON.stringify(embedding),
         metadata: {
-          ...(validatedData.metadata || {}),
+          ...(validatedData.metadata as any || {}),
           processingStatus: "processed",
           embeddingModel: "text-embedding-ada-002",
           chunkCount: Math.ceil(validatedData.content.length / 1000)
