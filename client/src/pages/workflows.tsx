@@ -2,15 +2,12 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import VisualWorkflowBuilder from "@/components/workflow/visual-workflow-builder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Plus, Workflow as WorkflowIcon, Settings, Trash2, Play, Calendar } from "lucide-react";
+import { Plus, Workflow as WorkflowIcon, Settings, Trash2, Play, Calendar, Edit } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Workflow } from "@shared/schema";
@@ -18,12 +15,8 @@ import type { Workflow } from "@shared/schema";
 export default function Workflows() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newWorkflow, setNewWorkflow] = useState({
-    name: "",
-    description: "",
-    schedule: "",
-  });
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
 
   const { data: workflows, isLoading } = useQuery<Workflow[]>({
     queryKey: ["/api/workflows"],
@@ -48,20 +41,10 @@ export default function Workflows() {
   });
 
   const createWorkflowMutation = useMutation({
-    mutationFn: (workflow: typeof newWorkflow) => apiRequest("POST", "/api/workflows", {
-      ...workflow,
-      definition: {
-        nodes: [
-          { id: "start", type: "trigger", config: { type: "manual" } }
-        ],
-        edges: []
-      },
-      isActive: true,
-    }),
+    mutationFn: (workflow: any) => apiRequest("POST", "/api/workflows", workflow),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
-      setIsCreateOpen(false);
-      setNewWorkflow({ name: "", description: "", schedule: "" });
+      setIsBuilderOpen(false);
       toast({
         title: "Success",
         description: "Workflow created successfully",
@@ -76,16 +59,8 @@ export default function Workflows() {
     },
   });
 
-  const handleCreateWorkflow = () => {
-    if (!newWorkflow.name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Workflow name is required",
-      });
-      return;
-    }
-    createWorkflowMutation.mutate(newWorkflow);
+  const handleSaveWorkflow = (workflowData: any) => {
+    createWorkflowMutation.mutate(workflowData);
   };
 
   if (isLoading) {
@@ -123,65 +98,14 @@ export default function Workflows() {
           title="Workflows" 
           subtitle="Create and manage automation workflows"
           action={
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  className="bg-primary-500 hover:bg-primary-600 text-white"
-                  data-testid="button-create-workflow"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Workflow
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New Workflow</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      placeholder="Workflow name..."
-                      value={newWorkflow.name}
-                      onChange={(e) => setNewWorkflow(prev => ({ ...prev, name: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Workflow description..."
-                      value={newWorkflow.description}
-                      onChange={(e) => setNewWorkflow(prev => ({ ...prev, description: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="schedule">Schedule (optional)</Label>
-                    <Input
-                      id="schedule"
-                      placeholder="Cron expression (e.g., 0 9 * * 1)"
-                      value={newWorkflow.schedule}
-                      onChange={(e) => setNewWorkflow(prev => ({ ...prev, schedule: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsCreateOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleCreateWorkflow}
-                      disabled={createWorkflowMutation.isPending}
-                    >
-                      {createWorkflowMutation.isPending ? "Creating..." : "Create Workflow"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              className="bg-primary-500 hover:bg-primary-600 text-white"
+              onClick={() => setIsBuilderOpen(true)}
+              data-testid="button-create-workflow"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Build Workflow
+            </Button>
           }
         />
         
@@ -197,7 +121,7 @@ export default function Workflows() {
                 <Button 
                   className="bg-primary-500 hover:bg-primary-600 text-white"
                   data-testid="button-create-first-workflow"
-                  onClick={() => setIsCreateOpen(true)}
+                  onClick={() => setIsBuilderOpen(true)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Your First Workflow
@@ -239,9 +163,13 @@ export default function Workflows() {
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          onClick={() => {
+                            setEditingWorkflow(workflow);
+                            setIsBuilderOpen(true);
+                          }}
                           data-testid={`button-edit-workflow-${workflow.id}`}
                         >
-                          <Settings className="w-4 h-4" />
+                          <Edit className="w-4 h-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
@@ -303,6 +231,17 @@ export default function Workflows() {
             </div>
           )}
         </main>
+
+        {/* Visual Workflow Builder */}
+        <VisualWorkflowBuilder
+          isOpen={isBuilderOpen}
+          onClose={() => {
+            setIsBuilderOpen(false);
+            setEditingWorkflow(null);
+          }}
+          editingWorkflow={editingWorkflow}
+          onSave={handleSaveWorkflow}
+        />
       </div>
     </div>
   );

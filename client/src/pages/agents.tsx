@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import AgentBuilder from "@/components/agents/agent-builder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,9 @@ import { Plus, Bot, Settings, Trash2 } from "lucide-react";
 import type { Agent, Skill } from "@shared/schema";
 
 export default function Agents() {
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+
   const { data: agents, isLoading: agentsLoading } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
   });
@@ -60,6 +64,7 @@ export default function Agents() {
           action={
             <Button 
               className="bg-primary-500 hover:bg-primary-600 text-white"
+              onClick={() => setIsBuilderOpen(true)}
               data-testid="button-create-agent"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -79,6 +84,7 @@ export default function Agents() {
                 </p>
                 <Button 
                   className="bg-primary-500 hover:bg-primary-600 text-white"
+                  onClick={() => setIsBuilderOpen(true)}
                   data-testid="button-create-first-agent"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -112,6 +118,10 @@ export default function Agents() {
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          onClick={() => {
+                            setEditingAgent(agent);
+                            setIsBuilderOpen(true);
+                          }}
                           data-testid={`button-edit-agent-${agent.id}`}
                         >
                           <Settings className="w-4 h-4" />
@@ -172,6 +182,16 @@ export default function Agents() {
             </div>
           )}
         </main>
+
+        {/* Agent Builder */}
+        <AgentBuilder
+          isOpen={isBuilderOpen}
+          onClose={() => {
+            setIsBuilderOpen(false);
+            setEditingAgent(null);
+          }}
+          editingAgent={editingAgent}
+        />
       </div>
     </div>
   );

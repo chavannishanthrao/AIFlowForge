@@ -2,17 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import ConnectorSetupWizard from "@/components/connectors/connector-setup-wizard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Plug, Settings, Trash2, CheckCircle, AlertCircle } from "lucide-react";
+import { Plus, Plug, Settings, Trash2, CheckCircle, AlertCircle, ExternalLink, Shield, Zap } from "lucide-react";
+import { SiSalesforce, SiOracle } from "react-icons/si";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Connector } from "@shared/schema";
@@ -20,16 +17,9 @@ import type { Connector } from "@shared/schema";
 export default function Connectors() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingConnector, setEditingConnector] = useState<Connector | null>(null);
   const [deleteConnectorId, setDeleteConnectorId] = useState<string | null>(null);
-  const [newConnector, setNewConnector] = useState({
-    name: "",
-    type: "",
-    config: {} as any,
-    description: "",
-  });
 
   const { data: connectors, isLoading } = useQuery<Connector[]>({
     queryKey: ["/api/connectors"],
@@ -38,15 +28,15 @@ export default function Connectors() {
   const getConnectorIcon = (type: string) => {
     switch (type) {
       case "salesforce":
-        return "🔗";
+        return SiSalesforce;
       case "netsuite":
-        return "💼";
+        return SiOracle;
       case "email":
-        return "📧";
-      case "slack":
-        return "💬";
+        return ({ className }: { className?: string }) => <span className={className}>📧</span>;
+      case "dynamics":
+        return ({ className }: { className?: string }) => <span className={className}>🏢</span>;
       default:
-        return "🔌";
+        return Plug;
     }
   };
 
@@ -66,15 +56,10 @@ export default function Connectors() {
   };
 
   const createConnectorMutation = useMutation({
-    mutationFn: (connector: typeof newConnector) => apiRequest("POST", "/api/connectors", {
-      ...connector,
-      isActive: false,
-      credentials: {},
-    }),
+    mutationFn: (connector: any) => apiRequest("POST", "/api/connectors", connector),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/connectors"] });
-      setIsCreateOpen(false);
-      setNewConnector({ name: "", type: "", config: {}, description: "" });
+      setIsWizardOpen(false);
       toast({
         title: "Success",
         description: "Connector created successfully",
@@ -93,7 +78,6 @@ export default function Connectors() {
     mutationFn: (connector: Connector) => apiRequest("PUT", `/api/connectors/${connector.id}`, connector),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/connectors"] });
-      setIsEditOpen(false);
       setEditingConnector(null);
       toast({
         title: "Success",
@@ -128,27 +112,12 @@ export default function Connectors() {
     },
   });
 
-  const handleCreateConnector = () => {
-    if (!newConnector.name.trim() || !newConnector.type) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Name and type are required",
-      });
-      return;
-    }
-    createConnectorMutation.mutate(newConnector);
-  };
-
   const handleEditConnector = (connector: Connector) => {
     setEditingConnector(connector);
-    setIsEditOpen(true);
   };
 
-  const handleUpdateConnector = () => {
-    if (editingConnector) {
-      updateConnectorMutation.mutate(editingConnector);
-    }
+  const handleWizardComplete = (connectorData: any) => {
+    createConnectorMutation.mutate(connectorData);
   };
 
   const handleDeleteConnector = (id: string) => {
@@ -190,75 +159,14 @@ export default function Connectors() {
           title="Connectors" 
           subtitle="Manage enterprise system connections"
           action={
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  className="bg-primary-500 hover:bg-primary-600 text-white"
-                  data-testid="button-create-connector"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Connector
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New Connector</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      placeholder="Connector name..."
-                      value={newConnector.name}
-                      onChange={(e) => setNewConnector(prev => ({ ...prev, name: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="type">Type</Label>
-                    <Select 
-                      value={newConnector.type} 
-                      onValueChange={(value) => setNewConnector(prev => ({ ...prev, type: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select connector type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="salesforce">Salesforce</SelectItem>
-                        <SelectItem value="netsuite">NetSuite</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="slack">Slack</SelectItem>
-                        <SelectItem value="api">Custom API</SelectItem>
-                        <SelectItem value="database">Database</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Connector description..."
-                      value={newConnector.description}
-                      onChange={(e) => setNewConnector(prev => ({ ...prev, description: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsCreateOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleCreateConnector}
-                      disabled={createConnectorMutation.isPending}
-                    >
-                      {createConnectorMutation.isPending ? "Creating..." : "Create Connector"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              className="bg-primary-500 hover:bg-primary-600 text-white"
+              onClick={() => setIsWizardOpen(true)}
+              data-testid="button-create-connector"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Connector
+            </Button>
           }
         />
         
@@ -274,7 +182,7 @@ export default function Connectors() {
                 <Button 
                   className="bg-primary-500 hover:bg-primary-600 text-white"
                   data-testid="button-create-first-connector"
-                  onClick={() => setIsCreateOpen(true)}
+                  onClick={() => setIsWizardOpen(true)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Your First Connector
@@ -288,8 +196,11 @@ export default function Connectors() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3 flex-1">
-                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-lg">
-                          {getConnectorIcon(connector.type)}
+                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                          {(() => {
+                            const IconComponent = getConnectorIcon(connector.type);
+                            return <IconComponent className="w-5 h-5 text-orange-600" />;
+                          })()}
                         </div>
                         <div>
                           <CardTitle className="text-lg font-semibold text-gray-900 mb-1">
@@ -374,69 +285,12 @@ export default function Connectors() {
           )}
         </main>
 
-        {/* Edit Connector Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Edit Connector</DialogTitle>
-            </DialogHeader>
-            {editingConnector && (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="editName">Name</Label>
-                  <Input
-                    id="editName"
-                    placeholder="Connector name..."
-                    value={editingConnector.name}
-                    onChange={(e) => setEditingConnector(prev => prev ? { ...prev, name: e.target.value } : null)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editType">Type</Label>
-                  <Select 
-                    value={editingConnector.type} 
-                    onValueChange={(value) => setEditingConnector(prev => prev ? { ...prev, type: value } : null)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select connector type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="salesforce">Salesforce</SelectItem>
-                      <SelectItem value="netsuite">NetSuite</SelectItem>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="slack">Slack</SelectItem>
-                      <SelectItem value="api">Custom API</SelectItem>
-                      <SelectItem value="database">Database</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="editDescription">Description</Label>
-                  <Textarea
-                    id="editDescription"
-                    placeholder="Connector description..."
-                    value={(editingConnector as any).description || ""}
-                    onChange={(e) => setEditingConnector(prev => prev ? { ...prev, description: e.target.value } : null)}
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsEditOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleUpdateConnector}
-                    disabled={updateConnectorMutation.isPending}
-                  >
-                    {updateConnectorMutation.isPending ? "Updating..." : "Update Connector"}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Connector Setup Wizard */}
+        <ConnectorSetupWizard
+          isOpen={isWizardOpen}
+          onClose={() => setIsWizardOpen(false)}
+          onComplete={handleWizardComplete}
+        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!deleteConnectorId} onOpenChange={() => setDeleteConnectorId(null)}>
