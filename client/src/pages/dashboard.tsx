@@ -30,13 +30,13 @@ export default function Dashboard() {
         />
         
         <main className="flex-1 overflow-y-auto p-6">
-          <StatsGrid stats={stats} isLoading={statsLoading} />
+          <StatsGrid stats={stats as any} isLoading={statsLoading} />
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
               <RecentWorkflows 
-                workflows={workflows || []} 
-                executions={executions || []} 
+                workflows={workflows as any || []} 
+                executions={executions as any || []} 
                 isLoading={workflowsLoading || executionsLoading} 
               />
             </div>
