@@ -5,7 +5,11 @@ import {
   type AuditLog, type InsertAuditLog, type Document, type InsertDocument,
   type ExecutionMetric, type InsertExecutionMetric,
   type PerformanceAlert, type InsertPerformanceAlert,
-  type UsageStat, type InsertUsageStat
+  type UsageStat, type InsertUsageStat,
+  type EmailAccount, type InsertEmailAccount,
+  type EmailMessage, type InsertEmailMessage,
+  type EmailAttachment, type InsertEmailAttachment,
+  type EmailRule, type InsertEmailRule,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -83,7 +87,38 @@ export interface IStorage {
     topPerformingWorkflows: Array<{ id: string; name: string; executions: number; successRate: number }>;
     costByWorkflow: Array<{ workflowId: string; name: string; cost: number }>;
     alertsSummary: { critical: number; high: number; medium: number; low: number };
+    agentPerformanceMetrics: Array<{ id: string; name: string; executions: number; averageTime: number; successRate: number; tokensUsed: number; cost: number }>;
+    optimizationSuggestions: Array<{ type: string; title: string; description: string; priority: 'high' | 'medium' | 'low'; potentialSavings?: number }>;
+    usagePatterns: { peakHours: number[]; mostActiveWorkflows: string[]; resourceBottlenecks: string[] };
   }>;
+
+  // Email Processing System
+  getEmailAccounts(): Promise<EmailAccount[]>;
+  getEmailAccount(id: string): Promise<EmailAccount | undefined>;
+  createEmailAccount(account: InsertEmailAccount): Promise<EmailAccount>;
+  updateEmailAccount(id: string, account: Partial<InsertEmailAccount>): Promise<EmailAccount | undefined>;
+  deleteEmailAccount(id: string): Promise<boolean>;
+  
+  getEmailMessages(accountId?: string): Promise<EmailMessage[]>;
+  getEmailMessage(id: string): Promise<EmailMessage | undefined>;
+  createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
+  updateEmailMessage(id: string, message: Partial<InsertEmailMessage>): Promise<EmailMessage | undefined>;
+  
+  getEmailAttachments(messageId: string): Promise<EmailAttachment[]>;
+  getEmailAttachment(id: string): Promise<EmailAttachment | undefined>;
+  createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment>;
+  updateEmailAttachment(id: string, attachment: Partial<InsertEmailAttachment>): Promise<EmailAttachment | undefined>;
+  
+  getEmailRules(accountId?: string): Promise<EmailRule[]>;
+  getEmailRule(id: string): Promise<EmailRule | undefined>;
+  createEmailRule(rule: InsertEmailRule): Promise<EmailRule>;
+  updateEmailRule(id: string, rule: Partial<InsertEmailRule>): Promise<EmailRule | undefined>;
+  deleteEmailRule(id: string): Promise<boolean>;
+
+  // Email Processing Operations
+  processIncomingEmail(messageId: string): Promise<{ workflowTriggered: boolean; executionId?: string }>;
+  extractDataFromAttachment(attachmentId: string): Promise<{ success: boolean; extractedData?: any; error?: string }>;
+  syncEmailAccount(accountId: string): Promise<{ newMessages: number; processedMessages: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -98,10 +133,17 @@ export class MemStorage implements IStorage {
   private executionMetrics: Map<string, ExecutionMetric> = new Map();
   private performanceAlerts: Map<string, PerformanceAlert> = new Map();
   private usageStats: Map<string, UsageStat> = new Map();
+  
+  // Email Processing Storage
+  private emailAccounts: Map<string, EmailAccount> = new Map();
+  private emailMessages: Map<string, EmailMessage> = new Map();
+  private emailAttachments: Map<string, EmailAttachment> = new Map();
+  private emailRules: Map<string, EmailRule> = new Map();
 
   constructor() {
     // Initialize with sample data
     this.initializeSampleData();
+    this.initializeEmailProcessingData();
   }
 
   private initializeSampleData() {
@@ -353,6 +395,157 @@ export class MemStorage implements IStorage {
       activeUsers: 5,
     };
     this.usageStats.set(yesterdayStats.id, yesterdayStats);
+  }
+
+  private initializeEmailProcessingData() {
+    const adminUser = Array.from(this.users.values()).find(u => u.role === 'admin');
+    if (!adminUser) return;
+
+    const workflows = Array.from(this.workflows.values());
+    const financeWorkflow = workflows.find(w => w.name.includes('Finance'));
+
+    // Create sample email account
+    const gmailAccount: EmailAccount = {
+      id: randomUUID(),
+      name: "Business Gmail",
+      email: "business@company.com",
+      provider: "gmail",
+      credentials: { 
+        accessToken: "encrypted_gmail_access_token",
+        refreshToken: "encrypted_gmail_refresh_token",
+        scope: "https://www.googleapis.com/auth/gmail.readonly"
+      },
+      isActive: true,
+      createdBy: adminUser.id,
+      lastSyncAt: new Date(Date.now() - 3600000), // 1 hour ago
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailAccounts.set(gmailAccount.id, gmailAccount);
+
+    // Create sample email processing rule
+    const invoiceProcessingRule: EmailRule = {
+      id: randomUUID(),
+      name: "Invoice Processing Rule",
+      accountId: gmailAccount.id,
+      conditions: {
+        senderContains: "@vendor.com",
+        subjectContains: "Invoice",
+        hasAttachments: true,
+        attachmentTypes: ["pdf"]
+      },
+      actions: {
+        extractData: true,
+        forwardToNetSuite: true,
+        sendNotification: true
+      },
+      workflowId: financeWorkflow?.id || null,
+      priority: 1,
+      isActive: true,
+      createdBy: adminUser.id,
+      triggerCount: 15,
+      lastTriggeredAt: new Date(Date.now() - 86400000), // 1 day ago
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailRules.set(invoiceProcessingRule.id, invoiceProcessingRule);
+
+    // Create sample processed email messages
+    const sampleMessage1: EmailMessage = {
+      id: randomUUID(),
+      accountId: gmailAccount.id,
+      messageId: "msg_sample_001",
+      threadId: "thread_001",
+      from: "vendor@supplier.com",
+      to: JSON.stringify([gmailAccount.email]),
+      cc: null,
+      bcc: null,
+      subject: "Invoice #INV-2025-001 - Services Rendered",
+      body: "Please find attached the invoice for services rendered in January 2025. Payment terms: Net 30.",
+      isRead: true,
+      hasAttachments: true,
+      receivedAt: new Date(Date.now() - 3600000),
+      processedAt: new Date(Date.now() - 3000000),
+      processingStatus: "completed",
+      workflowId: financeWorkflow?.id || null,
+      executionId: null,
+      extractedData: {
+        invoiceNumber: "INV-2025-001",
+        amount: 3500.00,
+        vendor: "Professional Services Inc",
+        dueDate: "2025-02-15"
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailMessages.set(sampleMessage1.id, sampleMessage1);
+
+    // Create sample attachment for the message
+    const sampleAttachment1: EmailAttachment = {
+      id: randomUUID(),
+      messageId: sampleMessage1.id,
+      filename: "invoice_INV-2025-001.pdf",
+      mimeType: "application/pdf",
+      size: 156789,
+      content: null,
+      filePath: null,
+      processedAt: new Date(Date.now() - 3000000),
+      processingStatus: "completed",
+      extractedData: {
+        type: "invoice",
+        invoiceNumber: "INV-2025-001",
+        amount: 3500.00,
+        currency: "USD",
+        vendor: "Professional Services Inc",
+        date: "2025-01-15",
+        dueDate: "2025-02-15",
+        extractionConfidence: 0.96
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailAttachments.set(sampleAttachment1.id, sampleAttachment1);
+
+    // Create another sample message pending processing
+    const sampleMessage2: EmailMessage = {
+      id: randomUUID(),
+      accountId: gmailAccount.id,
+      messageId: "msg_sample_002",
+      threadId: "thread_002",
+      from: "customer@business.com",
+      to: JSON.stringify([gmailAccount.email]),
+      cc: null,
+      bcc: null,
+      subject: "Customer Data Export - Q4 2024",
+      body: "Attached is the customer data export you requested. Please review and import to NetSuite.",
+      isRead: false,
+      hasAttachments: true,
+      receivedAt: new Date(Date.now() - 1800000), // 30 minutes ago
+      processedAt: null,
+      processingStatus: "pending",
+      workflowId: null,
+      executionId: null,
+      extractedData: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailMessages.set(sampleMessage2.id, sampleMessage2);
+
+    const sampleAttachment2: EmailAttachment = {
+      id: randomUUID(),
+      messageId: sampleMessage2.id,
+      filename: "customer_data_q4_2024.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      size: 987654,
+      content: null,
+      filePath: null,
+      processedAt: null,
+      processingStatus: "pending",
+      extractedData: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailAttachments.set(sampleAttachment2.id, sampleAttachment2);
   }
 
   // Users
@@ -975,6 +1168,370 @@ export class MemStorage implements IStorage {
       optimizationSuggestions,
       usagePatterns
     };
+  }
+
+  // Email Processing System Implementation
+  async getEmailAccounts(): Promise<EmailAccount[]> {
+    return Array.from(this.emailAccounts.values());
+  }
+
+  async getEmailAccount(id: string): Promise<EmailAccount | undefined> {
+    return this.emailAccounts.get(id);
+  }
+
+  async createEmailAccount(account: InsertEmailAccount): Promise<EmailAccount> {
+    const newAccount: EmailAccount = {
+      id: randomUUID(),
+      ...account,
+      isActive: account.isActive ?? true,
+      lastSyncAt: account.lastSyncAt ?? null,
+      createdBy: account.createdBy ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailAccounts.set(newAccount.id, newAccount);
+    return newAccount;
+  }
+
+  async updateEmailAccount(id: string, account: Partial<InsertEmailAccount>): Promise<EmailAccount | undefined> {
+    const existing = this.emailAccounts.get(id);
+    if (!existing) return undefined;
+
+    const updated: EmailAccount = {
+      ...existing,
+      ...account,
+      updatedAt: new Date(),
+    };
+    this.emailAccounts.set(id, updated);
+    return updated;
+  }
+
+  async deleteEmailAccount(id: string): Promise<boolean> {
+    return this.emailAccounts.delete(id);
+  }
+
+  async getEmailMessages(accountId?: string): Promise<EmailMessage[]> {
+    const messages = Array.from(this.emailMessages.values());
+    if (accountId) {
+      return messages.filter(msg => msg.accountId === accountId);
+    }
+    return messages;
+  }
+
+  async getEmailMessage(id: string): Promise<EmailMessage | undefined> {
+    return this.emailMessages.get(id);
+  }
+
+  async createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage> {
+    const newMessage: EmailMessage = {
+      id: randomUUID(),
+      ...message,
+      threadId: message.threadId ?? null,
+      cc: message.cc ?? null,
+      bcc: message.bcc ?? null,
+      subject: message.subject ?? null,
+      body: message.body ?? null,
+      isRead: message.isRead ?? false,
+      hasAttachments: message.hasAttachments ?? false,
+      processedAt: message.processedAt ?? null,
+      processingStatus: message.processingStatus ?? "pending",
+      workflowId: message.workflowId ?? null,
+      executionId: message.executionId ?? null,
+      extractedData: message.extractedData ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailMessages.set(newMessage.id, newMessage);
+    return newMessage;
+  }
+
+  async updateEmailMessage(id: string, message: Partial<InsertEmailMessage>): Promise<EmailMessage | undefined> {
+    const existing = this.emailMessages.get(id);
+    if (!existing) return undefined;
+
+    const updated: EmailMessage = {
+      ...existing,
+      ...message,
+      updatedAt: new Date(),
+    };
+    this.emailMessages.set(id, updated);
+    return updated;
+  }
+
+  async getEmailAttachments(messageId: string): Promise<EmailAttachment[]> {
+    return Array.from(this.emailAttachments.values()).filter(att => att.messageId === messageId);
+  }
+
+  async getEmailAttachment(id: string): Promise<EmailAttachment | undefined> {
+    return this.emailAttachments.get(id);
+  }
+
+  async createEmailAttachment(attachment: InsertEmailAttachment): Promise<EmailAttachment> {
+    const newAttachment: EmailAttachment = {
+      id: randomUUID(),
+      ...attachment,
+      content: attachment.content ?? null,
+      filePath: attachment.filePath ?? null,
+      processedAt: attachment.processedAt ?? null,
+      extractedData: attachment.extractedData ?? null,
+      processingStatus: attachment.processingStatus ?? "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailAttachments.set(newAttachment.id, newAttachment);
+    return newAttachment;
+  }
+
+  async updateEmailAttachment(id: string, attachment: Partial<InsertEmailAttachment>): Promise<EmailAttachment | undefined> {
+    const existing = this.emailAttachments.get(id);
+    if (!existing) return undefined;
+
+    const updated: EmailAttachment = {
+      ...existing,
+      ...attachment,
+      updatedAt: new Date(),
+    };
+    this.emailAttachments.set(id, updated);
+    return updated;
+  }
+
+  async getEmailRules(accountId?: string): Promise<EmailRule[]> {
+    const rules = Array.from(this.emailRules.values());
+    if (accountId) {
+      return rules.filter(rule => rule.accountId === accountId);
+    }
+    return rules;
+  }
+
+  async getEmailRule(id: string): Promise<EmailRule | undefined> {
+    return this.emailRules.get(id);
+  }
+
+  async createEmailRule(rule: InsertEmailRule): Promise<EmailRule> {
+    const newRule: EmailRule = {
+      id: randomUUID(),
+      ...rule,
+      workflowId: rule.workflowId ?? null,
+      priority: rule.priority ?? 0,
+      isActive: rule.isActive ?? true,
+      lastTriggeredAt: rule.lastTriggeredAt ?? null,
+      triggerCount: rule.triggerCount ?? 0,
+      createdBy: rule.createdBy ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.emailRules.set(newRule.id, newRule);
+    return newRule;
+  }
+
+  async updateEmailRule(id: string, rule: Partial<InsertEmailRule>): Promise<EmailRule | undefined> {
+    const existing = this.emailRules.get(id);
+    if (!existing) return undefined;
+
+    const updated: EmailRule = {
+      ...existing,
+      ...rule,
+      updatedAt: new Date(),
+    };
+    this.emailRules.set(id, updated);
+    return updated;
+  }
+
+  async deleteEmailRule(id: string): Promise<boolean> {
+    return this.emailRules.delete(id);
+  }
+
+  // Email Processing Operations
+  async processIncomingEmail(messageId: string): Promise<{ workflowTriggered: boolean; executionId?: string }> {
+    const message = this.emailMessages.get(messageId);
+    if (!message) {
+      return { workflowTriggered: false };
+    }
+
+    // Find matching rules for this message
+    const rules = Array.from(this.emailRules.values())
+      .filter(rule => rule.accountId === message.accountId && rule.isActive)
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+    for (const rule of rules) {
+      const conditions = rule.conditions as any;
+      let matches = true;
+
+      // Check sender conditions
+      if (conditions.senderContains && !message.from.includes(conditions.senderContains)) {
+        matches = false;
+      }
+
+      // Check subject conditions
+      if (conditions.subjectContains && message.subject && !message.subject.includes(conditions.subjectContains)) {
+        matches = false;
+      }
+
+      // Check attachment requirements
+      if (conditions.hasAttachments && !message.hasAttachments) {
+        matches = false;
+      }
+
+      if (matches && rule.workflowId) {
+        // Create execution for the workflow
+        const execution: Execution = {
+          id: randomUUID(),
+          workflowId: rule.workflowId,
+          status: "running",
+          input: { 
+            emailMessageId: messageId,
+            triggeringRule: rule.name,
+            emailData: {
+              from: message.from,
+              subject: message.subject,
+              receivedAt: message.receivedAt,
+              hasAttachments: message.hasAttachments
+            }
+          },
+          output: {},
+          error: null,
+          startedAt: new Date(),
+          completedAt: null,
+          executedBy: null,
+        };
+        
+        this.executions.set(execution.id, execution);
+
+        // Update rule statistics
+        const updatedRule = { ...rule, triggerCount: (rule.triggerCount || 0) + 1, lastTriggeredAt: new Date() };
+        this.emailRules.set(rule.id, updatedRule);
+
+        // Update message status
+        await this.updateEmailMessage(messageId, { 
+          processingStatus: "processing", 
+          workflowId: rule.workflowId, 
+          executionId: execution.id 
+        });
+
+        return { workflowTriggered: true, executionId: execution.id };
+      }
+    }
+
+    return { workflowTriggered: false };
+  }
+
+  async extractDataFromAttachment(attachmentId: string): Promise<{ success: boolean; extractedData?: any; error?: string }> {
+    const attachment = this.emailAttachments.get(attachmentId);
+    if (!attachment) {
+      return { success: false, error: "Attachment not found" };
+    }
+
+    // Simulate AI-powered data extraction based on file type
+    let extractedData: any = {};
+
+    try {
+      if (attachment.mimeType.includes('pdf')) {
+        // Simulate PDF data extraction (invoice, receipt, etc.)
+        extractedData = {
+          type: 'invoice',
+          invoiceNumber: 'INV-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+          amount: parseFloat((Math.random() * 10000).toFixed(2)),
+          currency: 'USD',
+          vendor: 'Sample Vendor Corp',
+          date: new Date().toISOString().split('T')[0],
+          lineItems: [
+            { description: 'Professional Services', quantity: 1, unitPrice: 2500.00 },
+            { description: 'Software License', quantity: 5, unitPrice: 199.99 }
+          ],
+          extractionConfidence: 0.95
+        };
+      } else if (attachment.mimeType.includes('excel') || attachment.mimeType.includes('csv')) {
+        // Simulate spreadsheet data extraction
+        extractedData = {
+          type: 'spreadsheet',
+          rows: 150,
+          columns: 8,
+          headers: ['Customer Name', 'Email', 'Phone', 'Company', 'Deal Value', 'Status', 'Source', 'Date'],
+          sampleData: [
+            { customerName: 'John Smith', email: 'john@company.com', dealValue: 15000, status: 'qualified' },
+            { customerName: 'Sarah Johnson', email: 'sarah@corp.com', dealValue: 8500, status: 'proposal' }
+          ],
+          extractionConfidence: 0.92
+        };
+      } else if (attachment.mimeType.includes('image')) {
+        // Simulate OCR/image processing
+        extractedData = {
+          type: 'receipt',
+          merchant: 'Tech Solutions Inc',
+          total: 456.78,
+          date: new Date().toISOString().split('T')[0],
+          items: ['Software Subscription', 'Support Package'],
+          extractionConfidence: 0.88
+        };
+      }
+
+      // Update attachment with extracted data
+      await this.updateEmailAttachment(attachmentId, {
+        extractedData,
+        processedAt: new Date(),
+        processingStatus: "completed"
+      });
+
+      return { success: true, extractedData };
+    } catch (error) {
+      return { success: false, error: `Extraction failed: ${error}` };
+    }
+  }
+
+  async syncEmailAccount(accountId: string): Promise<{ newMessages: number; processedMessages: number }> {
+    const account = this.emailAccounts.get(accountId);
+    if (!account || !account.isActive) {
+      return { newMessages: 0, processedMessages: 0 };
+    }
+
+    // Simulate syncing with email provider (Gmail, Outlook, etc.)
+    const newMessages = Math.floor(Math.random() * 5) + 1; // 1-5 new messages
+    let processedMessages = 0;
+
+    for (let i = 0; i < newMessages; i++) {
+      const hasAttachments = Math.random() > 0.7; // 30% chance of attachments
+      
+      const newMessage = await this.createEmailMessage({
+        accountId,
+        messageId: `msg_${Date.now()}_${i}`,
+        threadId: `thread_${Date.now()}`,
+        from: ['client@company.com', 'vendor@supplier.com', 'customer@business.com'][Math.floor(Math.random() * 3)],
+        to: JSON.stringify([account.email]),
+        subject: ['Invoice for Services', 'Customer Data Export', 'New Lead Information', 'Monthly Report'][Math.floor(Math.random() * 4)],
+        body: `This is an automated email with ${hasAttachments ? 'important attachments' : 'information'} for processing.`,
+        hasAttachments,
+        receivedAt: new Date(),
+        processingStatus: "pending"
+      });
+
+      if (hasAttachments) {
+        // Create sample attachments
+        const attachmentTypes = [
+          { filename: 'invoice.pdf', mimeType: 'application/pdf', size: 245760 },
+          { filename: 'customer_data.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 156432 },
+          { filename: 'receipt.jpg', mimeType: 'image/jpeg', size: 98304 }
+        ];
+        
+        const randomAttachment = attachmentTypes[Math.floor(Math.random() * attachmentTypes.length)];
+        await this.createEmailAttachment({
+          messageId: newMessage.id,
+          ...randomAttachment,
+          content: 'base64_encoded_content_here',
+          processingStatus: "pending"
+        });
+      }
+
+      // Try to process the message with rules
+      const result = await this.processIncomingEmail(newMessage.id);
+      if (result.workflowTriggered) {
+        processedMessages++;
+      }
+    }
+
+    // Update account sync timestamp
+    await this.updateEmailAccount(accountId, { lastSyncAt: new Date() });
+
+    return { newMessages, processedMessages };
   }
 }
 

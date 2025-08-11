@@ -12,7 +12,8 @@ import {
   FileText,
   Sliders,
   Brain,
-  LogOut
+  LogOut,
+  Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Workflows", href: "/workflows", icon: Workflow },
   { name: "Connectors", href: "/connectors", icon: Plug },
   { name: "Executions", href: "/executions", icon: Play },
+  { name: "Email Automation", href: "/email-automation", icon: Mail },
   { name: "Knowledge Base", href: "/knowledge", icon: Database },
 ];
 

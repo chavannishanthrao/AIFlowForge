@@ -10,6 +10,7 @@ import Workflows from "@/pages/workflows";
 import Connectors from "@/pages/connectors";
 import Executions from "@/pages/executions";
 import KnowledgeBase from "@/pages/knowledge";
+import { EmailAutomationPage } from "@/pages/email-automation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/connectors" component={Connectors} />
       <Route path="/executions" component={Executions} />
       <Route path="/knowledge" component={KnowledgeBase} />
+      <Route path="/email-automation" component={EmailAutomationPage} />
       <Route component={NotFound} />
     </Switch>
   );
