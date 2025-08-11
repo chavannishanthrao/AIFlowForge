@@ -1,0 +1,61 @@
+Build a production-ready repo scaffolding for an AI orchestration platform where non-technical business users create Skills, compose Agents from Skills, and orchestrate Workflows that run against enterprise systems (NetSuite, Oracle Fusion, Salesforce, SAP, Dynamics). Provide frontend (React + Tailwind), backend (Python FastAPI), database (Postgres), vector store (e.g., Milvus/PGVector), queuing/orchestration (Redis + RQ or Celery), and CI/CD configs. Include sample connectors, docs, tests, and a basic deployment manifest (Docker + Docker Compose or Kubernetes manifests).
+
+Requirements & Acceptance Criteria
+MVP Feature Set
+
+Skill creation: no-code wizard + AI-assisted skill generator (prompts → skill manifest).
+
+Agent creation: assign multiple skills, configure prompt settings, memory policy, credentials.
+
+Workflow builder: drag-and-drop builder in UI that ties triggers → agents → skill steps → outputs.
+
+Connectors: OAuth + credential storage for Salesforce and NetSuite (others stubbed).
+
+Execution engine: orchestrates agents and skills, supports sync/async tasks, branching (if/else), and retries.
+
+RAG: store business docs in vector DB, use retrieval during skill execution.
+
+Audit & governance: logs, role-based access, audit trail for workflows/skill changes.
+
+Tech stack
+
+Frontend: React (TypeScript) + Tailwind CSS; use shadcn components and lucide-react icons when needed.
+
+Backend: Python 3.11+, FastAPI, SQLAlchemy (Postgres), Redis, Celery or RQ, HTTP connectors.
+
+Auth: OAuth2 for user accounts; enterprise SSO stub (Okta) + per-connector OAuth.
+
+LLMs: pluggable LLM provider interface (OpenAI, Azure, local Llama 3/4 via Ollama or Hugging Face) with RAG.
+
+Storage: Postgres for metadata, PGVector for embeddings or vector DB adapter.
+
+DevOps: Dockerfiles, docker-compose, GitHub Actions CI for tests and builds.
+
+Deliverables from AI IDE
+
+Full repo scaffold: frontend, backend, infra, tests, README with setup & architecture.
+
+Schema & example JSON for Skill, Agent, Workflow.
+
+1 end-to-end sample: “Invoice Processing” skill + Finance Agent + weekly workflow pulling invoices from NetSuite and emailing CFO.
+
+Postman collection or OpenAPI spec for backend endpoints.
+
+Unit tests for core logic (skill execution, workflow orchestration).
+
+Sample UI flows/screens (mocked data) and a minimal drag-and-drop builder stub.
+
+Behavioural Instructions for the AI IDE
+Be pragmatic: produce working minimal implementations — prefer clarity and functioning code over perfection.
+
+One commit per major area: produce separate commits/messages/files for backend API, models, workflow engine, frontend scaffolding, connector stubs, and tests.
+
+Document thoroughly: every folder should have a README explaining purpose and how to run.
+
+Security-first: never log secrets; store connector creds encrypted (example using Fernet); include RBAC and audit logs.
+
+Pluggability: keep LLM provider, vector DB, and connector implementations behind interfaces so they can be swapped.
+
+Do not assume external internet keys: add .env.example and instructions to add API keys locally.
+
+Add TODOs where functionality is intentionally simplified or stubbed.
