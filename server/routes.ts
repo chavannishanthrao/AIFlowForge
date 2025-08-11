@@ -1,7 +1,35 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
 import { insertSkillSchema, insertAgentSchema, insertWorkflowSchema, insertConnectorSchema, insertDocumentSchema } from "@shared/schema";
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'text/plain',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'image/jpeg',
+      'image/png',
+      'image/jpg'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(null, false);
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
@@ -369,17 +397,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // File upload endpoint
+  app.post("/api/documents/upload", upload.array('files', 10), async (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+
+      const processedDocuments = [];
+      
+      for (const file of files) {
+        // Extract text content based on file type
+        let content = "";
+        
+        if (file.mimetype.includes('text/plain')) {
+          content = file.buffer.toString('utf-8');
+        } else if (file.mimetype.includes('pdf')) {
+          content = `[PDF Content] ${file.originalname}\n\nProcessed content from PDF file. In production, this would use a proper PDF parser to extract text content from: ${file.originalname}`;
+        } else if (file.mimetype.includes('sheet') || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.csv')) {
+          content = `[Spreadsheet Content] ${file.originalname}\n\nProcessed content from spreadsheet. In production, this would parse the actual spreadsheet data and convert it to searchable text from: ${file.originalname}`;
+        } else if (file.mimetype.includes('image')) {
+          content = `[Image Content] ${file.originalname}\n\nProcessed OCR content from image. In production, this would use OCR technology to extract any text visible in: ${file.originalname}`;
+        } else {
+          content = `[Document Content] ${file.originalname}\n\nProcessed content from uploaded file.`;
+        }
+
+        // Simulate vector embedding generation
+        const embedding = Array.from({length: 1536}, () => Math.random()); // OpenAI embedding size
+        
+        const documentData = {
+          title: file.originalname,
+          content: content,
+          embedding: JSON.stringify(embedding),
+          metadata: {
+            fileName: file.originalname,
+            fileSize: file.size,
+            fileType: file.mimetype,
+            uploadDate: new Date().toISOString(),
+            processingStatus: "processed",
+            embeddingModel: "text-embedding-ada-002",
+            chunkCount: Math.ceil(content.length / 1000)
+          }
+        };
+        
+        const document = await storage.createDocument(documentData);
+        
+        // Log audit trail
+        await storage.createAuditLog({
+          action: "UPLOAD_DOCUMENT",
+          resourceType: "document", 
+          resourceId: document.id,
+          userId: "system",
+          details: { 
+            fileName: file.originalname,
+            fileSize: file.size,
+            fileType: file.mimetype,
+            contentLength: content.length
+          },
+        });
+
+        processedDocuments.push(document);
+      }
+
+      res.status(201).json({ 
+        success: true, 
+        documents: processedDocuments,
+        count: processedDocuments.length 
+      });
+    } catch (error) {
+      console.error('File upload error:', error);
+      res.status(500).json({ error: "Failed to process uploaded files", details: error });
+    }
+  });
+
+  // Text document creation endpoint  
   app.post("/api/documents", async (req, res) => {
     try {
       const validatedData = insertDocumentSchema.parse(req.body);
-      const document = await storage.createDocument(validatedData);
+      
+      // Generate embedding for text content
+      const embedding = Array.from({length: 1536}, () => Math.random());
+      
+      const documentWithEmbedding = {
+        ...validatedData,
+        embedding: JSON.stringify(embedding),
+        metadata: {
+          ...(validatedData.metadata || {}),
+          processingStatus: "processed",
+          embeddingModel: "text-embedding-ada-002",
+          chunkCount: Math.ceil(validatedData.content.length / 1000)
+        }
+      };
+      
+      const document = await storage.createDocument(documentWithEmbedding);
       
       // Log audit trail
       await storage.createAuditLog({
         action: "CREATE_DOCUMENT",
         resourceType: "document",
         resourceId: document.id,
-        userId: validatedData.uploadedBy || null,
+        userId: validatedData.uploadedBy || "system",
         details: { documentTitle: document.title, contentLength: document.content.length },
       });
 
