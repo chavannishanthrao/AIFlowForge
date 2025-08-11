@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSkillSchema, insertAgentSchema, insertWorkflowSchema, insertConnectorSchema } from "@shared/schema";
+import { insertSkillSchema, insertAgentSchema, insertWorkflowSchema, insertConnectorSchema, insertDocumentSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
@@ -344,6 +344,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Documents routes
+  app.get("/api/documents", async (req, res) => {
+    try {
+      const documents = await storage.getDocuments();
+      res.json(documents);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  app.get("/api/documents/:id", async (req, res) => {
+    try {
+      const document = await storage.getDocument(req.params.id);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json(document);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch document" });
+    }
+  });
+
+  app.post("/api/documents", async (req, res) => {
+    try {
+      const validatedData = insertDocumentSchema.parse(req.body);
+      const document = await storage.createDocument(validatedData);
+      
+      // Log audit trail
+      await storage.createAuditLog({
+        action: "CREATE_DOCUMENT",
+        resourceType: "document",
+        resourceId: document.id,
+        userId: validatedData.uploadedBy || null,
+        details: { documentTitle: document.title, contentLength: document.content.length },
+      });
+
+      res.status(201).json(document);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid document data", details: error });
+    }
+  });
+
+  app.delete("/api/documents/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteDocument(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete document" });
     }
   });
 

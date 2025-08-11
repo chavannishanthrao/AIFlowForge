@@ -8,6 +8,8 @@ import Skills from "@/pages/skills";
 import Agents from "@/pages/agents";
 import Workflows from "@/pages/workflows";
 import Connectors from "@/pages/connectors";
+import Executions from "@/pages/executions";
+import KnowledgeBase from "@/pages/knowledge";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +20,8 @@ function Router() {
       <Route path="/agents" component={Agents} />
       <Route path="/workflows" component={Workflows} />
       <Route path="/connectors" component={Connectors} />
+      <Route path="/executions" component={Executions} />
+      <Route path="/knowledge" component={KnowledgeBase} />
       <Route component={NotFound} />
     </Switch>
   );
