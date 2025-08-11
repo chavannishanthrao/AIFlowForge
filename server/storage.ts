@@ -2,7 +2,10 @@ import {
   type User, type InsertUser, type Skill, type InsertSkill,
   type Agent, type InsertAgent, type Workflow, type InsertWorkflow,
   type Connector, type InsertConnector, type Execution, type InsertExecution,
-  type AuditLog, type InsertAuditLog, type Document, type InsertDocument
+  type AuditLog, type InsertAuditLog, type Document, type InsertDocument,
+  type ExecutionMetric, type InsertExecutionMetric,
+  type PerformanceAlert, type InsertPerformanceAlert,
+  type UsageStat, type InsertUsageStat
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -65,6 +68,22 @@ export interface IStorage {
     successfulExecutions: number;
     connectedSystems: number;
   }>;
+  
+  // Advanced Analytics Methods
+  getExecutionMetrics(workflowId?: string, timeRange?: 'hour' | 'day' | 'week' | 'month'): Promise<ExecutionMetric[]>;
+  getPerformanceAlerts(severity?: string): Promise<PerformanceAlert[]>;
+  getUsageStats(timeRange?: 'day' | 'week' | 'month'): Promise<UsageStat[]>;
+  createExecutionMetric(metric: InsertExecutionMetric): Promise<ExecutionMetric>;
+  createPerformanceAlert(alert: InsertPerformanceAlert): Promise<PerformanceAlert>;
+  createUsageStat(stat: InsertUsageStat): Promise<UsageStat>;
+  getAdvancedAnalytics(): Promise<{
+    totalCostThisMonth: number;
+    averageExecutionTime: number;
+    successRate: number;
+    topPerformingWorkflows: Array<{ id: string; name: string; executions: number; successRate: number }>;
+    costByWorkflow: Array<{ workflowId: string; name: string; cost: number }>;
+    alertsSummary: { critical: number; high: number; medium: number; low: number };
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -76,6 +95,9 @@ export class MemStorage implements IStorage {
   private executions: Map<string, Execution> = new Map();
   private auditLogs: Map<string, AuditLog> = new Map();
   private documents: Map<string, Document> = new Map();
+  private executionMetrics: Map<string, ExecutionMetric> = new Map();
+  private performanceAlerts: Map<string, PerformanceAlert> = new Map();
+  private usageStats: Map<string, UsageStat> = new Map();
 
   constructor() {
     // Initialize with sample data
@@ -240,6 +262,97 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.workflows.set(onboardingWorkflow.id, onboardingWorkflow);
+
+    // Initialize sample analytics data for demonstration
+    const metric1: ExecutionMetric = {
+      id: randomUUID(),
+      executionId: execution1.id,
+      workflowId: invoiceWorkflow.id,
+      agentId: financeAgent.id,
+      duration: 5000, // 5 seconds
+      tokensUsed: 1250,
+      cost: 15, // 15 cents
+      memoryUsed: 128,
+      errorCount: 0,
+      retryCount: 0,
+      timestamp: new Date(Date.now() - 1000 * 60 * 60),
+    };
+    this.executionMetrics.set(metric1.id, metric1);
+
+    const metric2: ExecutionMetric = {
+      id: randomUUID(),
+      executionId: execution2.id,
+      workflowId: onboardingWorkflow.id,
+      agentId: financeAgent.id,
+      duration: 12000, // 12 seconds
+      tokensUsed: 850,
+      cost: 10, // 10 cents
+      memoryUsed: 96,
+      errorCount: 1,
+      retryCount: 2,
+      timestamp: new Date(Date.now() - 1000 * 60 * 30),
+    };
+    this.executionMetrics.set(metric2.id, metric2);
+
+    // Initialize performance alerts
+    const alert1: PerformanceAlert = {
+      id: randomUUID(),
+      type: "high_latency",
+      severity: "high",
+      message: "Workflow execution time exceeded 10 seconds threshold",
+      resourceType: "workflow",
+      resourceId: onboardingWorkflow.id,
+      threshold: { maxLatency: 10000 },
+      currentValue: { actualLatency: 12000 },
+      isResolved: false,
+      createdAt: new Date(Date.now() - 1000 * 60 * 25),
+      resolvedAt: null,
+    };
+    this.performanceAlerts.set(alert1.id, alert1);
+
+    const alert2: PerformanceAlert = {
+      id: randomUUID(),
+      type: "high_error_rate",
+      severity: "medium",
+      message: "Error rate is above 20% for this workflow",
+      resourceType: "workflow",
+      resourceId: onboardingWorkflow.id,
+      threshold: { maxErrorRate: 0.2 },
+      currentValue: { actualErrorRate: 0.5 },
+      isResolved: false,
+      createdAt: new Date(Date.now() - 1000 * 60 * 15),
+      resolvedAt: null,
+    };
+    this.performanceAlerts.set(alert2.id, alert2);
+
+    // Initialize usage stats for analytics charts
+    const todayStats: UsageStat = {
+      id: randomUUID(),
+      date: new Date(),
+      totalExecutions: 25,
+      successfulExecutions: 20,
+      failedExecutions: 5,
+      totalCost: 250, // $2.50
+      totalTokens: 15000,
+      averageLatency: 3500,
+      peakConcurrency: 8,
+      activeUsers: 3,
+    };
+    this.usageStats.set(todayStats.id, todayStats);
+
+    const yesterdayStats: UsageStat = {
+      id: randomUUID(),
+      date: new Date(Date.now() - 1000 * 60 * 60 * 24), // Yesterday
+      totalExecutions: 42,
+      successfulExecutions: 38,
+      failedExecutions: 4,
+      totalCost: 420, // $4.20
+      totalTokens: 28000,
+      averageLatency: 2800,
+      peakConcurrency: 12,
+      activeUsers: 5,
+    };
+    this.usageStats.set(yesterdayStats.id, yesterdayStats);
   }
 
   // Users
@@ -554,6 +667,222 @@ export class MemStorage implements IStorage {
       skills,
       successfulExecutions,
       connectedSystems,
+    };
+  }
+
+  // Advanced Analytics Methods
+  async getExecutionMetrics(workflowId?: string, timeRange?: 'hour' | 'day' | 'week' | 'month'): Promise<ExecutionMetric[]> {
+    let metrics = Array.from(this.executionMetrics.values());
+    
+    if (workflowId) {
+      metrics = metrics.filter(m => m.workflowId === workflowId);
+    }
+    
+    if (timeRange) {
+      const now = new Date();
+      const cutoff = new Date();
+      
+      switch (timeRange) {
+        case 'hour':
+          cutoff.setHours(now.getHours() - 1);
+          break;
+        case 'day':
+          cutoff.setDate(now.getDate() - 1);
+          break;
+        case 'week':
+          cutoff.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          cutoff.setMonth(now.getMonth() - 1);
+          break;
+      }
+      
+      metrics = metrics.filter(m => m.timestamp && new Date(m.timestamp) >= cutoff);
+    }
+    
+    return metrics.sort((a, b) => {
+      const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return bTime - aTime;
+    });
+  }
+
+  async getPerformanceAlerts(severity?: string): Promise<PerformanceAlert[]> {
+    let alerts = Array.from(this.performanceAlerts.values()).filter(a => !a.isResolved);
+    
+    if (severity) {
+      alerts = alerts.filter(a => a.severity === severity);
+    }
+    
+    return alerts.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  }
+
+  async getUsageStats(timeRange?: 'day' | 'week' | 'month'): Promise<UsageStat[]> {
+    let stats = Array.from(this.usageStats.values());
+    
+    if (timeRange) {
+      const now = new Date();
+      const cutoff = new Date();
+      
+      switch (timeRange) {
+        case 'day':
+          cutoff.setDate(now.getDate() - 1);
+          break;
+        case 'week':
+          cutoff.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          cutoff.setMonth(now.getMonth() - 1);
+          break;
+      }
+      
+      stats = stats.filter(s => s.date && new Date(s.date) >= cutoff);
+    }
+    
+    return stats.sort((a, b) => {
+      const aTime = a.date ? new Date(a.date).getTime() : 0;
+      const bTime = b.date ? new Date(b.date).getTime() : 0;
+      return bTime - aTime;
+    });
+  }
+
+  async createExecutionMetric(insertMetric: InsertExecutionMetric): Promise<ExecutionMetric> {
+    const id = randomUUID();
+    const metric: ExecutionMetric = {
+      id,
+      executionId: insertMetric.executionId || null,
+      workflowId: insertMetric.workflowId || null,
+      agentId: insertMetric.agentId || null,
+      duration: insertMetric.duration || null,
+      tokensUsed: insertMetric.tokensUsed || 0,
+      cost: insertMetric.cost || 0,
+      memoryUsed: insertMetric.memoryUsed || 0,
+      errorCount: insertMetric.errorCount || 0,
+      retryCount: insertMetric.retryCount || 0,
+      timestamp: new Date(),
+    };
+    this.executionMetrics.set(id, metric);
+    return metric;
+  }
+
+  async createPerformanceAlert(insertAlert: InsertPerformanceAlert): Promise<PerformanceAlert> {
+    const id = randomUUID();
+    const alert: PerformanceAlert = {
+      id,
+      type: insertAlert.type,
+      severity: insertAlert.severity || "medium",
+      message: insertAlert.message,
+      resourceType: insertAlert.resourceType,
+      resourceId: insertAlert.resourceId || null,
+      threshold: insertAlert.threshold || null,
+      currentValue: insertAlert.currentValue || null,
+      isResolved: insertAlert.isResolved || false,
+      createdAt: new Date(),
+      resolvedAt: insertAlert.resolvedAt || null,
+    };
+    this.performanceAlerts.set(id, alert);
+    return alert;
+  }
+
+  async createUsageStat(insertStat: InsertUsageStat): Promise<UsageStat> {
+    const id = randomUUID();
+    const stat: UsageStat = {
+      id,
+      date: insertStat.date,
+      totalExecutions: insertStat.totalExecutions || 0,
+      successfulExecutions: insertStat.successfulExecutions || 0,
+      failedExecutions: insertStat.failedExecutions || 0,
+      totalCost: insertStat.totalCost || 0,
+      totalTokens: insertStat.totalTokens || 0,
+      averageLatency: insertStat.averageLatency || 0,
+      peakConcurrency: insertStat.peakConcurrency || 0,
+      activeUsers: insertStat.activeUsers || 0,
+    };
+    this.usageStats.set(id, stat);
+    return stat;
+  }
+
+  async getAdvancedAnalytics(): Promise<{
+    totalCostThisMonth: number;
+    averageExecutionTime: number;
+    successRate: number;
+    topPerformingWorkflows: Array<{ id: string; name: string; executions: number; successRate: number }>;
+    costByWorkflow: Array<{ workflowId: string; name: string; cost: number }>;
+    alertsSummary: { critical: number; high: number; medium: number; low: number };
+  }> {
+    const now = new Date();
+    const monthAgo = new Date();
+    monthAgo.setMonth(now.getMonth() - 1);
+    
+    // Calculate costs from metrics
+    const recentMetrics = Array.from(this.executionMetrics.values())
+      .filter(m => m.timestamp && new Date(m.timestamp) >= monthAgo);
+    
+    const totalCostThisMonth = recentMetrics.reduce((sum, m) => sum + (m.cost || 0), 0);
+    const averageExecutionTime = recentMetrics.length > 0 
+      ? Math.round(recentMetrics.reduce((sum, m) => sum + (m.duration || 0), 0) / recentMetrics.length)
+      : 0;
+    
+    // Calculate success rate
+    const recentExecutions = Array.from(this.executions.values())
+      .filter(e => e.startedAt && new Date(e.startedAt) >= monthAgo);
+    const successfulExecutions = recentExecutions.filter(e => e.status === 'success').length;
+    const successRate = recentExecutions.length > 0 
+      ? Math.round((successfulExecutions / recentExecutions.length) * 100) 
+      : 0;
+    
+    // Get top performing workflows
+    const workflowStats = new Map();
+    const workflows = Array.from(this.workflows.values());
+    
+    workflows.forEach(workflow => {
+      const workflowExecutions = recentExecutions.filter(e => e.workflowId === workflow.id);
+      const successful = workflowExecutions.filter(e => e.status === 'success').length;
+      const successRate = workflowExecutions.length > 0 ? Math.round((successful / workflowExecutions.length) * 100) : 0;
+      
+      workflowStats.set(workflow.id, {
+        id: workflow.id,
+        name: workflow.name,
+        executions: workflowExecutions.length,
+        successRate
+      });
+    });
+    
+    const topPerformingWorkflows = Array.from(workflowStats.values())
+      .sort((a, b) => b.executions - a.executions)
+      .slice(0, 5);
+    
+    // Calculate cost by workflow
+    const costByWorkflow = workflows.map(workflow => {
+      const workflowMetrics = recentMetrics.filter(m => m.workflowId === workflow.id);
+      const cost = workflowMetrics.reduce((sum, m) => sum + (m.cost || 0), 0);
+      return {
+        workflowId: workflow.id,
+        name: workflow.name,
+        cost
+      };
+    }).sort((a, b) => b.cost - a.cost);
+    
+    // Calculate alerts summary
+    const activeAlerts = Array.from(this.performanceAlerts.values()).filter(a => !a.isResolved);
+    const alertsSummary = {
+      critical: activeAlerts.filter(a => a.severity === 'critical').length,
+      high: activeAlerts.filter(a => a.severity === 'high').length,
+      medium: activeAlerts.filter(a => a.severity === 'medium').length,
+      low: activeAlerts.filter(a => a.severity === 'low').length,
+    };
+    
+    return {
+      totalCostThisMonth,
+      averageExecutionTime,
+      successRate,
+      topPerformingWorkflows,
+      costByWorkflow,
+      alertsSummary
     };
   }
 }

@@ -42,6 +42,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Advanced Analytics endpoints
+  app.get("/api/analytics/advanced", async (req, res) => {
+    try {
+      const analytics = await storage.getAdvancedAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch advanced analytics" });
+    }
+  });
+
+  app.get("/api/analytics/metrics", async (req, res) => {
+    try {
+      const { workflowId, timeRange } = req.query;
+      const metrics = await storage.getExecutionMetrics(
+        workflowId as string, 
+        timeRange as 'hour' | 'day' | 'week' | 'month'
+      );
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch execution metrics" });
+    }
+  });
+
+  app.get("/api/analytics/alerts", async (req, res) => {
+    try {
+      const { severity } = req.query;
+      const alerts = await storage.getPerformanceAlerts(severity as string);
+      res.json(alerts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch performance alerts" });
+    }
+  });
+
+  app.get("/api/analytics/usage-stats", async (req, res) => {
+    try {
+      const { timeRange } = req.query;
+      const stats = await storage.getUsageStats(timeRange as 'day' | 'week' | 'month');
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch usage statistics" });
+    }
+  });
+
   // Skills routes
   app.get("/api/skills", async (req, res) => {
     try {
