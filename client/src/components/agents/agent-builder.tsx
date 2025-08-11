@@ -202,6 +202,11 @@ export default function AgentBuilder({ isOpen, onClose, editingAgent }: AgentBui
         memoryPolicy: template.memoryPolicy
       }));
     }
+    
+    // Auto-advance to next step after template selection
+    setTimeout(() => {
+      setCurrentStep(1);
+    }, 500);
   };
 
   const handleSkillToggle = (skillId: string) => {

@@ -107,6 +107,11 @@ export default function ConnectorSetupWizard({ isOpen, onClose, onComplete }: Co
   const handleTypeSelection = (type: string) => {
     setSelectedType(type);
     setConnectorData(prev => ({ ...prev, type }));
+    
+    // Auto-advance to next step after type selection
+    setTimeout(() => {
+      setCurrentStep(1);
+    }, 500);
   };
 
   const handleNext = () => {
