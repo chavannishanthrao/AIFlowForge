@@ -104,6 +104,48 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Analytics tables for advanced monitoring
+export const executionMetrics = pgTable("execution_metrics", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  executionId: uuid("execution_id").references(() => executions.id),
+  workflowId: uuid("workflow_id").references(() => workflows.id),
+  agentId: uuid("agent_id").references(() => agents.id),
+  duration: integer("duration"), // execution time in milliseconds
+  tokensUsed: integer("tokens_used").default(0),
+  cost: integer("cost").default(0), // cost in cents
+  memoryUsed: integer("memory_used").default(0), // in MB
+  errorCount: integer("error_count").default(0),
+  retryCount: integer("retry_count").default(0),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const performanceAlerts = pgTable("performance_alerts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // high_latency, high_cost, high_error_rate, resource_limit
+  severity: text("severity").notNull().default("medium"), // low, medium, high, critical
+  message: text("message").notNull(),
+  resourceType: text("resource_type").notNull(), // workflow, agent, skill
+  resourceId: uuid("resource_id"),
+  threshold: jsonb("threshold"), // threshold values that triggered the alert
+  currentValue: jsonb("current_value"), // current metric values
+  isResolved: boolean("is_resolved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const usageStats = pgTable("usage_stats", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: timestamp("date").notNull(),
+  totalExecutions: integer("total_executions").default(0),
+  successfulExecutions: integer("successful_executions").default(0),
+  failedExecutions: integer("failed_executions").default(0),
+  totalCost: integer("total_cost").default(0), // in cents
+  totalTokens: integer("total_tokens").default(0),
+  averageLatency: integer("average_latency").default(0), // in milliseconds
+  peakConcurrency: integer("peak_concurrency").default(0),
+  activeUsers: integer("active_users").default(0),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -150,6 +192,20 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   createdAt: true,
 });
 
+export const insertExecutionMetricSchema = createInsertSchema(executionMetrics).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertPerformanceAlertSchema = createInsertSchema(performanceAlerts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUsageStatSchema = createInsertSchema(usageStats).omit({
+  id: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -174,3 +230,12 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+export type InsertExecutionMetric = z.infer<typeof insertExecutionMetricSchema>;
+export type ExecutionMetric = typeof executionMetrics.$inferSelect;
+
+export type InsertPerformanceAlert = z.infer<typeof insertPerformanceAlertSchema>;
+export type PerformanceAlert = typeof performanceAlerts.$inferSelect;
+
+export type InsertUsageStat = z.infer<typeof insertUsageStatSchema>;
+export type UsageStat = typeof usageStats.$inferSelect;
